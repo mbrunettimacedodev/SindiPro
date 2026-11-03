@@ -1,0 +1,12 @@
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Senhas locais: nunca vão para o GitHub
+segredos.properties*
+!segredos.properties.example
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
