@@ -3,6 +3,7 @@ package br.com.sindipro.sindipro.controller;
 import br.com.sindipro.sindipro.model.Unidade;
 import br.com.sindipro.sindipro.service.UnidadeService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Tag(name = "Unidades", description = "Unidades (apartamentos) de cada prédio")
 @RequestMapping("/unidades")
 public class UnidadeController {
 

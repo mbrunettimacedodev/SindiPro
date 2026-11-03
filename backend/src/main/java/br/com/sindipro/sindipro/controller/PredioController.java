@@ -3,6 +3,7 @@ package br.com.sindipro.sindipro.controller;
 import br.com.sindipro.sindipro.model.Predio;
 import br.com.sindipro.sindipro.service.PredioService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Tag(name = "Prédios", description = "Cadastro de prédios (condomínios)")
 @RequestMapping("/predios")
 public class PredioController {
 

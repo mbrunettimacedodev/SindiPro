@@ -38,6 +38,14 @@
 			<artifactId>spring-security-crypto</artifactId>
 		</dependency>
 
+		<!-- NOVO: Swagger / OpenAPI. Gera sozinho a documentação da API lendo os controllers.
+		     Acesse http://localhost:8080/swagger-ui.html com o backend rodando. -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>3.1.0</version>
+		</dependency>
+
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>

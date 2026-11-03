@@ -3,6 +3,7 @@ package br.com.sindipro.sindipro.controller;
 import br.com.sindipro.sindipro.model.Evento;
 import br.com.sindipro.sindipro.service.EventoService;
 import jakarta.validation.Valid;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@Tag(name = "Eventos", description = "Eventos do condomínio (assembleias, festas, manutenções)")
 @RequestMapping("/eventos")
 public class EventoController {
 

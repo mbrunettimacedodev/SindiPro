@@ -1,10 +1,12 @@
-# Banco de dados local do SindiPro (PostgreSQL 16) — para rodar o projeto sem Supabase.
-# Uso:  docker compose up -d      (sobe o banco)
-#       docker compose down -v    (desliga E apaga os dados, para recomeçar do zero)
+# SindiPro completo no Docker: banco (PostgreSQL) + backend (Spring Boot) + frontend (React).
 #
-# Na PRIMEIRA vez que o container sobe, o Postgres roda sozinho os scripts abaixo, em ordem:
-#   01-schema.sql  -> cria as tabelas
-#   02-dados.sql   -> insere dados de exemplo
+# Subir tudo:            docker compose up -d --build
+# Acessar o sistema:     http://localhost:5173   (login: admin@sindipro.com / admin123)
+# Documentação da API:   http://localhost:8080/swagger-ui.html
+# Desligar:              docker compose down
+# Zerar o banco:         docker compose down -v   (apaga os dados e volta aos dados de exemplo)
+#
+# Só o banco (para rodar backend/frontend pelo IntelliJ e npm):   docker compose up -d banco
 services:
   banco:
     image: postgres:16-alpine
@@ -17,12 +19,39 @@ services:
       - "5432:5432"
     volumes:
       - dados-sindipro:/var/lib/postgresql/data
+      # Na PRIMEIRA vez, o Postgres roda estes scripts em ordem: tabelas e depois dados de exemplo.
       - ./backend/sql/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./backend/sql/dados-exemplo.sql:/docker-entrypoint-initdb.d/02-dados.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U sindipro -d sindipro"]
       interval: 5s
       retries: 10
+
+  backend:
+    build: ./backend
+    container_name: sindipro-backend
+    environment:
+      # Dentro do Docker o banco não é "localhost": é o serviço "banco" deste arquivo.
+      DB_URL: jdbc:postgresql://banco:5432/sindipro
+      DB_USER: sindipro
+      DB_PASSWORD: sindipro
+    ports:
+      - "8080:8080"
+    depends_on:
+      banco:
+        condition: service_healthy # só sobe depois que o banco estiver pronto
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Quem chama a API é o navegador, que roda fora do Docker: por isso é localhost:8080.
+        VITE_API_URL: http://localhost:8080
+    container_name: sindipro-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
 
 volumes:
   dados-sindipro:
