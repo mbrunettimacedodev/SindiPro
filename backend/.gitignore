@@ -1,5 +1,9 @@
-target/
-.idea/
-*.iml
-.vscode/
-HELP.md
+   target/
+   .idea/
+   *.iml
+   .vscode/
+   HELP.md
+
+   # Senhas locais (Supabase etc.): nunca vão para o GitHub
+   segredos.properties*
+   !segredos.properties.example
