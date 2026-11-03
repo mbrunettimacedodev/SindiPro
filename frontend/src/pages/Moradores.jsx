@@ -1,8 +1,30 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { Aviso, Botao, Campo, Carregando, Cartao, SemRegistros, estiloInput } from '../components/ui.jsx'
+import ModalConfirmar from '../components/ModalConfirmar.jsx'
+import {
+  Aviso,
+  BarraFiltro,
+  Botao,
+  BotaoIcone,
+  Campo,
+  Carregando,
+  Cartao,
+  SemRegistros,
+  Selo,
+  estiloInput,
+  filtrar,
+  tabela,
+} from '../components/ui.jsx'
 
-const FORM_VAZIO = { nome: '', cpf: '', idade: '', tipo: 'PROPRIETARIO', valorAluguel: '', unidadeId: '' }
+const FORM_VAZIO = {
+  nome: '',
+  cpf: '',
+  email: '',
+  idade: '',
+  tipo: 'PROPRIETARIO',
+  valorAluguel: '',
+  unidadeId: '',
+}
 
 export default function Moradores() {
   const [moradores, setMoradores] = useState([])
@@ -13,6 +35,8 @@ export default function Moradores() {
   const [erro, setErro] = useState('')
   const [campos, setCampos] = useState({})
   const [sucesso, setSucesso] = useState('')
+  const [busca, setBusca] = useState('')
+  const [moradorParaExcluir, setMoradorParaExcluir] = useState(null)
 
   async function carregar() {
     setCarregando(true)
@@ -43,6 +67,7 @@ export default function Moradores() {
     const corpo = {
       nome: form.nome,
       cpf: form.cpf,
+      email: form.email.trim().toLowerCase(),
       idade: Number(form.idade),
       tipo: form.tipo,
       // Só inquilino tem aluguel. Para proprietário mandamos null (o backend também garante isso).
@@ -59,7 +84,7 @@ export default function Moradores() {
       cancelar()
       carregar()
     } catch (e) {
-      // Aqui aparece, por exemplo: "Já existe um morador cadastrado com o CPF 111.222.333-44"
+      // Ex.: "Já existe um morador cadastrado com o CPF 111.222.333-44"
       setErro(e.message)
       setCampos(e.campos || {})
     }
@@ -70,9 +95,10 @@ export default function Moradores() {
     setForm({
       nome: m.nome,
       cpf: m.cpf,
+      email: m.email ?? '', // ?? troca null por '' (input não aceita null)
       idade: m.idade,
       tipo: m.tipo,
-      valorAluguel: m.valorAluguel ?? '', // ?? troca null por '' (input não aceita null)
+      valorAluguel: m.valorAluguel ?? '',
       unidadeId: m.unidade.id,
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -83,18 +109,31 @@ export default function Moradores() {
     setForm(FORM_VAZIO)
   }
 
-  async function excluir(id) {
-    if (!window.confirm('Excluir este morador?')) return
+  async function confirmarExclusao() {
+    const morador = moradorParaExcluir
+    setMoradorParaExcluir(null)
     setErro('')
     setSucesso('')
     try {
-      await api.delete(`/moradores/${id}`)
+      await api.delete(`/moradores/${morador.id}`)
       setSucesso('Morador excluído.')
       carregar()
     } catch (e) {
+      // Ex.: "o morador ainda possui encomendas registradas"
       setErro(e.message)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
+
+  const visiveis = filtrar(
+    moradores,
+    busca,
+    (m) =>
+      `${m.nome} ${m.cpf} ${m.email ?? ''} ${m.tipo === 'INQUILINO' ? 'inquilino' : 'proprietario'} bloco ${
+        m.unidade?.bloco
+      } apto ${m.unidade?.numeroApartamento}`,
+  )
+  const contador = busca.trim() ? `${visiveis.length} de ${moradores.length}` : moradores.length
 
   return (
     <>
@@ -106,8 +145,26 @@ export default function Moradores() {
           <Campo rotulo="Nome" erro={campos.nome}>
             <input name="nome" value={form.nome} onChange={mudar} className={estiloInput} />
           </Campo>
-          <Campo rotulo="CPF" erro={campos.cpf}>
-            <input name="cpf" value={form.cpf} onChange={mudar} placeholder="000.000.000-00" className={estiloInput} />
+          {/* O CPF identifica o morador: depois de cadastrado não muda. O e-mail fica atrelado a ele e pode ser trocado. */}
+          <Campo rotulo={editandoId ? 'CPF (não pode ser alterado)' : 'CPF'} erro={campos.cpf}>
+            <input
+              name="cpf"
+              value={form.cpf}
+              onChange={mudar}
+              placeholder="000.000.000-00"
+              disabled={!!editandoId}
+              className={estiloInput}
+            />
+          </Campo>
+          <Campo rotulo="E-mail" erro={campos.email}>
+            <input
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={mudar}
+              placeholder="morador@email.com"
+              className={estiloInput}
+            />
           </Campo>
           <Campo rotulo="Idade" erro={campos.idade}>
             <input name="idade" type="number" value={form.idade} onChange={mudar} className={estiloInput} />
@@ -131,10 +188,17 @@ export default function Moradores() {
           {/* Renderização condicional: o campo só existe na tela se o tipo for INQUILINO. */}
           {form.tipo === 'INQUILINO' && (
             <Campo rotulo="Valor do aluguel (R$)" erro={campos.valorAluguel}>
-              <input name="valorAluguel" type="number" step="0.01" value={form.valorAluguel} onChange={mudar} className={estiloInput} />
+              <input
+                name="valorAluguel"
+                type="number"
+                step="0.01"
+                value={form.valorAluguel}
+                onChange={mudar}
+                className={estiloInput}
+              />
             </Campo>
           )}
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex justify-center gap-2 sm:col-span-2">
             <Botao type="submit">{editandoId ? 'Salvar alterações' : 'Cadastrar'}</Botao>
             {editandoId && (
               <Botao type="button" variante="neutro" onClick={cancelar}>
@@ -145,47 +209,80 @@ export default function Moradores() {
         </form>
       </Cartao>
 
-      <Cartao titulo="Moradores cadastrados">
+      <Cartao titulo={`Moradores cadastrados (${contador})`}>
         {carregando ? (
           <Carregando />
         ) : moradores.length === 0 ? (
           <SemRegistros>Nenhum morador cadastrado ainda.</SemRegistros>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b text-slate-500">
-                <tr>
-                  <th className="py-2">Nome</th>
-                  <th>CPF</th>
-                  <th>Tipo</th>
-                  <th>Unidade</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {moradores.map((m) => (
-                  <tr key={m.id} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{m.nome}</td>
-                    <td>{m.cpf}</td>
-                    <td>
-                      {m.tipo === 'INQUILINO'
-                        ? `Inquilino (R$ ${Number(m.valorAluguel).toFixed(2)})`
-                        : 'Proprietário'}
-                    </td>
-                    <td>
-                      Bloco {m.unidade.bloco}, apto {m.unidade.numeroApartamento}
-                    </td>
-                    <td className="space-x-2 py-2 text-right">
-                      <Botao variante="neutro" onClick={() => editar(m)}>Editar</Botao>
-                      <Botao variante="perigo" onClick={() => excluir(m.id)}>Excluir</Botao>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <BarraFiltro
+              busca={busca}
+              aoBuscar={setBusca}
+              placeholder="Pesquisar por nome, CPF, e-mail, tipo, bloco ou apto..."
+            />
+
+            {visiveis.length === 0 ? (
+              <SemRegistros>Nenhum morador encontrado para "{busca}".</SemRegistros>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className={tabela.cabecalho}>
+                    <tr>
+                      <th className="py-2 pr-4">Nome</th>
+                      <th className="pr-4">CPF</th>
+                      <th className="pr-4">Tipo</th>
+                      <th className="pr-4">Unidade</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiveis.map((m) => (
+                      <tr key={m.id} className={tabela.linha}>
+                        <td className={tabela.principal}>
+                          {m.nome}
+                          <span className={`block ${tabela.apagado}`}>{m.email || 'sem e-mail'}</span>
+                        </td>
+                        <td className={`${tabela.texto} whitespace-nowrap`}>{m.cpf}</td>
+                        <td className={tabela.texto}>
+                          {m.tipo === 'INQUILINO' ? (
+                            <>
+                              <Selo cor="amarelo">Inquilino</Selo>
+                              <span className={`block ${tabela.apagado}`}>
+                                R$ {Number(m.valorAluguel).toFixed(2)}
+                              </span>
+                            </>
+                          ) : (
+                            <Selo cor="azul">Proprietário</Selo>
+                          )}
+                        </td>
+                        <td className={tabela.texto}>
+                          Bloco {m.unidade.bloco}, apto {m.unidade.numeroApartamento}
+                        </td>
+                        <td className="py-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            <BotaoIcone tipo="editar" onClick={() => editar(m)} />
+                            <BotaoIcone tipo="excluir" onClick={() => setMoradorParaExcluir(m)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Cartao>
+
+      {moradorParaExcluir && (
+        <ModalConfirmar
+          titulo="Excluir morador?"
+          mensagem={`Você vai excluir "${moradorParaExcluir.nome}". Essa ação não pode ser desfeita.`}
+          aoConfirmar={confirmarExclusao}
+          aoCancelar={() => setMoradorParaExcluir(null)}
+        />
+      )}
     </>
   )
 }

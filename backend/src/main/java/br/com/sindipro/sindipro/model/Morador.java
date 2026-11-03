@@ -1,5 +1,6 @@
 package br.com.sindipro.sindipro.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -7,12 +8,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.PositiveOrZero;
+import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
 
@@ -37,6 +40,14 @@ public class Morador {
     @NotBlank(message = "O CPF é obrigatório")
     @Pattern(regexp = "\\d{3}\\.?\\d{3}\\.?\\d{3}-?\\d{2}", message = "CPF inválido (use 000.000.000-00)")
     private String cpf;
+
+    // NOVO: e-mail atrelado ao CPF. O CPF identifica a pessoa e nunca muda; o e-mail pode ser trocado.
+    // unique = true: dois moradores não podem ter o mesmo e-mail (a checagem amigável fica no MoradorService).
+    @NotBlank(message = "O e-mail é obrigatório")
+    @Email(message = "E-mail inválido")
+    @Size(max = 120, message = "O e-mail pode ter no máximo 120 caracteres")
+    @Column(unique = true, length = 120)
+    private String email;
 
     @Min(value = 0, message = "A idade não pode ser negativa")
     @Max(value = 130, message = "Idade inválida")
@@ -70,6 +81,10 @@ public class Morador {
         return cpf;
     }
 
+    public String getEmail() {
+        return email;
+    }
+
     public int getIdade() {
         return idade;
     }
@@ -101,6 +116,10 @@ public class Morador {
 
     public void setCpf(String cpf) {
         this.cpf = cpf;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public void setIdade(int idade) {

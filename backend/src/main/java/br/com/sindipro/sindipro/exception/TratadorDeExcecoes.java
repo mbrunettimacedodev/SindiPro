@@ -28,6 +28,12 @@ public class TratadorDeExcecoes {
         return resposta(HttpStatus.CONFLICT, ex.getMessage(), null);
     }
 
+    // 401: login com e-mail ou senha errados
+    @ExceptionHandler(CredenciaisInvalidasException.class)
+    public ResponseEntity<Map<String, Object>> tratarCredenciais(CredenciaisInvalidasException ex) {
+        return resposta(HttpStatus.UNAUTHORIZED, ex.getMessage(), null);
+    }
+
     // 400: o @Valid reprovou o corpo da requisição (campo vazio, CEP inválido...)
     // Devolvemos um mapa campo -> mensagem, ex: {"rua": "A rua é obrigatória"}
     @ExceptionHandler(MethodArgumentNotValidException.class)

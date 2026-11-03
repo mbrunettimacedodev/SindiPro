@@ -14,6 +14,11 @@ public interface MoradorRepository extends JpaRepository<Morador, Long> {
     // Sem o "IdNot", o morador não conseguiria salvar a si mesmo sem bater no próprio CPF.
     boolean existsByCpfAndIdNot(String cpf, Long id);
 
+    // Mesma ideia do CPF, agora para o e-mail (que também não pode repetir).
+    boolean existsByEmail(String email);
+
+    boolean existsByEmailAndIdNot(String email, Long id);
+
     // Impede apagar uma unidade que ainda tem moradores.
     boolean existsByUnidadeId(Long unidadeId);
 

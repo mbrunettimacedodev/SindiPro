@@ -29,7 +29,7 @@ class FluxoCompletoApiTest {
             {"bloco":"A","andar":1,"numeroApartamento":101,"predio":{"id":1}}""";
 
     private static final String MORADOR = """
-            {"nome":"Maria","cpf":"111.222.333-44","idade":40,"tipo":"PROPRIETARIO","unidade":{"id":1}}""";
+            {"nome":"Maria","cpf":"111.222.333-44","email":"maria@email.com","idade":40,"tipo":"PROPRIETARIO","unidade":{"id":1}}""";
 
     @Test
     void fluxoCompleto() throws Exception {
@@ -105,5 +105,55 @@ class FluxoCompletoApiTest {
 
         // 12) Morador com encomenda não pode ser apagado
         mvc.perform(delete("/moradores/1")).andExpect(status().isConflict());
+
+        // 13) E-mail: obrigatório, válido e sem repetir
+        mvc.perform(post("/moradores").contentType(MediaType.APPLICATION_JSON)
+                        .content(MORADOR.replace("\"email\":\"maria@email.com\",", "").replace("111.222.333-44", "555.666.777-88")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.campos.email").value("O e-mail é obrigatório"));
+        mvc.perform(post("/moradores").contentType(MediaType.APPLICATION_JSON)
+                        .content(MORADOR.replace("111.222.333-44", "555.666.777-88")))
+                .andExpect(status().isConflict()); // mesmo e-mail da Maria
+
+        // 14) O CPF não pode ser alterado; o e-mail pode (e é salvo em minúsculas)
+        mvc.perform(put("/moradores/1").contentType(MediaType.APPLICATION_JSON)
+                        .content(MORADOR.replace("111.222.333-44", "999.888.777-66")))
+                .andExpect(status().isConflict());
+        mvc.perform(put("/moradores/1").contentType(MediaType.APPLICATION_JSON)
+                        .content(MORADOR.replace("maria@email.com", "Maria.Nova@Email.com")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cpf").value("111.222.333-44"))
+                .andExpect(jsonPath("$.email").value("maria.nova@email.com"));
+
+        // 15) Login: o admin é criado ao subir a aplicação. Senha errada -> 401, sem dizer o motivo
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@sindipro.com\",\"senha\":\"admin123\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nome").value("Administrador"))
+                .andExpect(jsonPath("$.senhaHash").doesNotExist()); // a senha nunca volta na resposta
+        mvc.perform(post("/auth/login").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"admin@sindipro.com\",\"senha\":\"errada\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.erro").value("E-mail ou senha inválidos"));
+
+        // 16) Eventos: um passado e um futuro; "proximos=true" só traz o futuro
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\":\"Assembleia\",\"local\":\"Salão\",\"dataHora\":\"2099-01-10T19:00\",\"predio\":{\"id\":1}}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.predio.nomeCondominio").value("Aurora"));
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"titulo\":\"Festa antiga\",\"local\":\"Salão\",\"dataHora\":\"2020-01-10T19:00\",\"predio\":{\"id\":1}}"))
+                .andExpect(status().isCreated());
+        mvc.perform(get("/eventos")).andExpect(jsonPath("$.length()").value(2));
+        mvc.perform(get("/eventos?proximos=true"))
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].titulo").value("Assembleia"));
+
+        // 17) Evento sem título nem data -> 400 com erro por campo
+        mvc.perform(post("/eventos").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"local\":\"Salão\",\"predio\":{\"id\":1}}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.campos.titulo").exists())
+                .andExpect(jsonPath("$.campos.dataHora").exists());
     }
 }

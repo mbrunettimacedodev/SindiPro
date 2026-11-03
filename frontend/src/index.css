@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* Tema escuro "por classe": as classes dark:... só valem quando o <html> tem a classe "dark".
+   Quem coloca/tira essa classe é o hook useTema (src/tema.js). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Faz o navegador desenhar <select>, calendário e barra de rolagem no modo escuro também. */
+html.dark {
+  color-scheme: dark;
+}

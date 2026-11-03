@@ -25,6 +25,8 @@ CREATE TABLE morador (
     id SERIAL PRIMARY KEY,
     nome VARCHAR(100) NOT NULL,
     cpf VARCHAR(14) NOT NULL UNIQUE,
+    -- NOVO: e-mail atrelado ao CPF. Pode ser trocado; o CPF não. UNIQUE = dois moradores não dividem e-mail.
+    email VARCHAR(120) UNIQUE,
     idade INTEGER NOT NULL,
     unidade_id INTEGER NOT NULL,
     tipo VARCHAR(20) NOT NULL,
@@ -57,3 +59,24 @@ CREATE TABLE encomenda (
 -- Proteção extra no banco: mesmo que alguém insira direto por SQL, o tipo continua válido.
 ALTER TABLE morador
     ADD CONSTRAINT ck_morador_tipo CHECK (tipo IN ('INQUILINO', 'PROPRIETARIO'));
+
+-- NOVA: eventos do condomínio (assembleia, festa, manutenção...). Todo evento pertence a um prédio.
+CREATE TABLE evento (
+    id SERIAL PRIMARY KEY,
+    titulo VARCHAR(100) NOT NULL,
+    descricao VARCHAR(500),
+    local VARCHAR(100) NOT NULL,
+    data_hora TIMESTAMP NOT NULL,
+    predio_id INTEGER NOT NULL,
+    FOREIGN KEY (predio_id) REFERENCES predio(id)
+);
+
+-- NOVA: usuários que podem entrar no sistema (síndico, portaria...).
+-- A senha NUNCA é guardada pura: "senha_hash" guarda o resultado do BCrypt.
+CREATE TABLE usuario (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(120) NOT NULL UNIQUE,
+    senha_hash VARCHAR(100) NOT NULL
+);
+-- O primeiro usuário (admin) é criado pelo próprio backend ao iniciar: veja CriadorUsuarioInicial.java.

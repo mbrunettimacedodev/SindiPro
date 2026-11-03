@@ -1,6 +1,19 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { Aviso, Botao, Campo, Carregando, Cartao, SemRegistros, estiloInput } from '../components/ui.jsx'
+import ModalConfirmar from '../components/ModalConfirmar.jsx'
+import {
+  Aviso,
+  BarraFiltro,
+  Botao,
+  BotaoIcone,
+  Campo,
+  Carregando,
+  Cartao,
+  SemRegistros,
+  estiloInput,
+  filtrar,
+  tabela,
+} from '../components/ui.jsx'
 
 // Formulário "vazio". Usamos para limpar a tela depois de salvar.
 const FORM_VAZIO = { rua: '', bairro: '', cidade: '', cep: '', nomeCondominio: '', numeroCondominio: '' }
@@ -13,6 +26,8 @@ export default function Predios() {
   const [erro, setErro] = useState('')
   const [campos, setCampos] = useState({}) // erros por campo, vindos do backend (@Valid)
   const [sucesso, setSucesso] = useState('')
+  const [busca, setBusca] = useState('') // texto da pesquisa
+  const [predioParaExcluir, setPredioParaExcluir] = useState(null) // prédio que está na janela de confirmação
 
   async function carregar() {
     setCarregando(true)
@@ -75,19 +90,30 @@ export default function Predios() {
     setForm(FORM_VAZIO)
   }
 
-  async function excluir(id) {
-    if (!window.confirm('Excluir este prédio?')) return
+  // Roda quando o usuário clica em "Excluir" na janela de confirmação.
+  async function confirmarExclusao() {
+    const predio = predioParaExcluir
+    setPredioParaExcluir(null) // fecha a janela
     setErro('')
     setSucesso('')
     try {
-      await api.delete(`/predios/${id}`)
+      await api.delete(`/predios/${predio.id}`)
       setSucesso('Prédio excluído.')
       carregar()
     } catch (e) {
       // Aqui aparece a regra do backend: "o prédio ainda possui unidades cadastradas".
       setErro(e.message)
+      window.scrollTo({ top: 0, behavior: 'smooth' }) // o aviso fica no topo da página
     }
   }
+
+  // Lista que aparece na tela: já filtrada pela pesquisa.
+  const visiveis = filtrar(
+    predios,
+    busca,
+    (p) => `${p.nomeCondominio} ${p.numeroCondominio} ${p.rua} ${p.bairro} ${p.cidade} ${p.cep}`,
+  )
+  const contador = busca.trim() ? `${visiveis.length} de ${predios.length}` : predios.length
 
   return (
     <>
@@ -114,7 +140,7 @@ export default function Predios() {
           <Campo rotulo="CEP" erro={campos.cep}>
             <input name="cep" value={form.cep} onChange={mudar} placeholder="12345-678" className={estiloInput} />
           </Campo>
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex justify-center gap-2 sm:col-span-2">
             <Botao type="submit">{editandoId ? 'Salvar alterações' : 'Cadastrar'}</Botao>
             {editandoId && (
               <Botao type="button" variante="neutro" onClick={cancelar}>
@@ -125,43 +151,67 @@ export default function Predios() {
         </form>
       </Cartao>
 
-      <Cartao titulo="Prédios cadastrados">
+      <Cartao titulo={`Prédios cadastrados (${contador})`}>
         {carregando ? (
           <Carregando />
         ) : predios.length === 0 ? (
           <SemRegistros>Nenhum prédio cadastrado ainda.</SemRegistros>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b text-slate-500">
-                <tr>
-                  <th className="py-2">Condomínio</th>
-                  <th>Endereço</th>
-                  <th>CEP</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {predios.map((p) => (
-                  <tr key={p.id} className="border-b last:border-0">
-                    <td className="py-2 font-medium">
-                      {p.nomeCondominio} <span className="text-slate-400">nº {p.numeroCondominio}</span>
-                    </td>
-                    <td>
-                      {p.rua}, {p.bairro} — {p.cidade}
-                    </td>
-                    <td>{p.cep}</td>
-                    <td className="space-x-2 py-2 text-right">
-                      <Botao variante="neutro" onClick={() => editar(p)}>Editar</Botao>
-                      <Botao variante="perigo" onClick={() => excluir(p.id)}>Excluir</Botao>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <BarraFiltro
+              busca={busca}
+              aoBuscar={setBusca}
+              placeholder="Pesquisar por nome, rua, bairro, cidade ou CEP..."
+            />
+
+            {visiveis.length === 0 ? (
+              <SemRegistros>Nenhum prédio encontrado para "{busca}".</SemRegistros>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className={tabela.cabecalho}>
+                    <tr>
+                      <th className="py-2 pr-4">Condomínio</th>
+                      <th className="pr-4">Endereço</th>
+                      <th className="pr-4">CEP</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiveis.map((p) => (
+                      <tr key={p.id} className={tabela.linha}>
+                        <td className={tabela.principal}>
+                          {p.nomeCondominio}{' '}
+                          <span className="font-normal text-slate-400 dark:text-slate-500">nº {p.numeroCondominio}</span>
+                        </td>
+                        <td className={tabela.texto}>
+                          {p.rua}, {p.bairro} — {p.cidade}
+                        </td>
+                        <td className={tabela.texto}>{p.cep}</td>
+                        <td className="py-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            <BotaoIcone tipo="editar" onClick={() => editar(p)} />
+                            <BotaoIcone tipo="excluir" onClick={() => setPredioParaExcluir(p)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Cartao>
+
+      {predioParaExcluir && (
+        <ModalConfirmar
+          titulo="Excluir prédio?"
+          mensagem={`Você vai excluir "${predioParaExcluir.nomeCondominio}". Essa ação não pode ser desfeita.`}
+          aoConfirmar={confirmarExclusao}
+          aoCancelar={() => setPredioParaExcluir(null)}
+        />
+      )}
     </>
   )
 }

@@ -41,6 +41,7 @@ public class MoradorService {
     public Morador criar(Morador morador) {
         morador.setId(null);
         morador.setCpf(formatarCpf(morador.getCpf()));
+        morador.setEmail(normalizarEmail(morador.getEmail()));
         carregarUnidade(morador);
         validarTipo(morador);
 
@@ -49,19 +50,29 @@ public class MoradorService {
         if (moradorRepository.existsByCpf(morador.getCpf())) {
             throw new RegraNegocioException("Já existe um morador cadastrado com o CPF " + morador.getCpf());
         }
+        if (moradorRepository.existsByEmail(morador.getEmail())) {
+            throw new RegraNegocioException("Já existe um morador cadastrado com o e-mail " + morador.getEmail());
+        }
         return moradorRepository.save(morador);
     }
 
     public Morador atualizar(Long id, Morador dados) {
-        buscarPorId(id);
+        Morador existente = buscarPorId(id);
         dados.setId(id);
-        dados.setCpf(formatarCpf(dados.getCpf()));
+
+        // REGRA: o CPF identifica o morador e NÃO pode ser trocado. O e-mail, atrelado a ele, pode.
+        // Comparamos já formatado: "11122233344" e "111.222.333-44" são o mesmo CPF.
+        if (!formatarCpf(dados.getCpf()).equals(existente.getCpf())) {
+            throw new RegraNegocioException("O CPF não pode ser alterado. Para trocar o CPF, exclua e cadastre o morador de novo");
+        }
+        dados.setCpf(existente.getCpf());
+        dados.setEmail(normalizarEmail(dados.getEmail()));
         carregarUnidade(dados);
         validarTipo(dados);
 
-        // Aqui usamos "AndIdNot": só é duplicado se for OUTRA pessoa com o mesmo CPF.
-        if (moradorRepository.existsByCpfAndIdNot(dados.getCpf(), id)) {
-            throw new RegraNegocioException("Já existe outro morador cadastrado com o CPF " + dados.getCpf());
+        // Aqui usamos "AndIdNot": só é duplicado se for OUTRA pessoa com o mesmo e-mail.
+        if (moradorRepository.existsByEmailAndIdNot(dados.getEmail(), id)) {
+            throw new RegraNegocioException("Já existe outro morador cadastrado com o e-mail " + dados.getEmail());
         }
         return moradorRepository.save(dados);
     }
@@ -80,6 +91,12 @@ public class MoradorService {
         String numeros = cpf.replaceAll("\\D", "");
         return numeros.substring(0, 3) + "." + numeros.substring(3, 6) + "."
                 + numeros.substring(6, 9) + "-" + numeros.substring(9, 11);
+    }
+
+    // Padroniza o e-mail: sem espaços nas pontas e tudo minúsculo.
+    // Sem isso, "Maria@Email.com" e "maria@email.com" passariam como e-mails diferentes.
+    private String normalizarEmail(String email) {
+        return email.trim().toLowerCase();
     }
 
     private void carregarUnidade(Morador morador) {

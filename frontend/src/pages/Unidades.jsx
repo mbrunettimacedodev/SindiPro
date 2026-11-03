@@ -1,6 +1,19 @@
 import { Fragment, useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { Aviso, Botao, Campo, Carregando, Cartao, SemRegistros, estiloInput } from '../components/ui.jsx'
+import ModalConfirmar from '../components/ModalConfirmar.jsx'
+import {
+  Aviso,
+  BarraFiltro,
+  Botao,
+  BotaoIcone,
+  Campo,
+  Carregando,
+  Cartao,
+  SemRegistros,
+  estiloInput,
+  filtrar,
+  tabela,
+} from '../components/ui.jsx'
 
 const FORM_VAZIO = { bloco: '', andar: '', numeroApartamento: '', predioId: '' }
 
@@ -13,8 +26,10 @@ export default function Unidades() {
   const [erro, setErro] = useState('')
   const [campos, setCampos] = useState({})
   const [sucesso, setSucesso] = useState('')
+  const [busca, setBusca] = useState('')
+  const [unidadeParaExcluir, setUnidadeParaExcluir] = useState(null)
 
-  // Detalhes de uma unidade (3º Andar: "mostrar moradores e vagas associadas")
+  // Detalhes de uma unidade: moradores e vagas associadas
   const [detalheId, setDetalheId] = useState(null)
   const [detalhe, setDetalhe] = useState({ moradores: [], vagas: [] })
 
@@ -78,16 +93,20 @@ export default function Unidades() {
     setForm(FORM_VAZIO)
   }
 
-  async function excluir(id) {
-    if (!window.confirm('Excluir esta unidade?')) return
+  async function confirmarExclusao() {
+    const unidade = unidadeParaExcluir
+    setUnidadeParaExcluir(null)
     setErro('')
     setSucesso('')
     try {
-      await api.delete(`/unidades/${id}`)
+      await api.delete(`/unidades/${unidade.id}`)
       setSucesso('Unidade excluída.')
+      if (detalheId === unidade.id) setDetalheId(null)
       carregar()
     } catch (e) {
+      // Ex.: "a unidade ainda possui moradores cadastrados"
       setErro(e.message)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
 
@@ -108,6 +127,13 @@ export default function Unidades() {
       setErro(e.message)
     }
   }
+
+  const visiveis = filtrar(
+    unidades,
+    busca,
+    (u) => `${u.predio?.nomeCondominio} bloco ${u.bloco} andar ${u.andar} apto ${u.numeroApartamento}`,
+  )
+  const contador = busca.trim() ? `${visiveis.length} de ${unidades.length}` : unidades.length
 
   return (
     <>
@@ -133,9 +159,15 @@ export default function Unidades() {
             <input name="andar" type="number" value={form.andar} onChange={mudar} className={estiloInput} />
           </Campo>
           <Campo rotulo="Nº do apartamento" erro={campos.numeroApartamento}>
-            <input name="numeroApartamento" type="number" value={form.numeroApartamento} onChange={mudar} className={estiloInput} />
+            <input
+              name="numeroApartamento"
+              type="number"
+              value={form.numeroApartamento}
+              onChange={mudar}
+              className={estiloInput}
+            />
           </Campo>
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex justify-center gap-2 sm:col-span-2">
             <Botao type="submit">{editandoId ? 'Salvar alterações' : 'Cadastrar'}</Botao>
             {editandoId && (
               <Botao type="button" variante="neutro" onClick={cancelar}>
@@ -146,77 +178,98 @@ export default function Unidades() {
         </form>
       </Cartao>
 
-      <Cartao titulo="Unidades cadastradas">
+      <Cartao titulo={`Unidades cadastradas (${contador})`}>
         {carregando ? (
           <Carregando />
         ) : unidades.length === 0 ? (
           <SemRegistros>Nenhuma unidade cadastrada ainda.</SemRegistros>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b text-slate-500">
-                <tr>
-                  <th className="py-2">Prédio</th>
-                  <th>Bloco</th>
-                  <th>Andar</th>
-                  <th>Apto</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {unidades.map((u) => (
-                  // Fragment com key: agrupa as 2 linhas (<tr>) de cada unidade sem criar uma tag extra no HTML.
-                  <Fragment key={u.id}>
-                    <tr className="border-b">
-                      <td className="py-2 font-medium">{u.predio.nomeCondominio}</td>
-                      <td>{u.bloco}</td>
-                      <td>{u.andar}º</td>
-                      <td>{u.numeroApartamento}</td>
-                      <td className="space-x-2 py-2 text-right">
-                        <Botao variante="neutro" onClick={() => alternarDetalhe(u.id)}>
-                          {detalheId === u.id ? 'Fechar' : 'Detalhes'}
-                        </Botao>
-                        <Botao variante="neutro" onClick={() => editar(u)}>Editar</Botao>
-                        <Botao variante="perigo" onClick={() => excluir(u.id)}>Excluir</Botao>
-                      </td>
+          <>
+            <BarraFiltro busca={busca} aoBuscar={setBusca} placeholder="Pesquisar por prédio, bloco, andar ou apto..." />
+
+            {visiveis.length === 0 ? (
+              <SemRegistros>Nenhuma unidade encontrada para "{busca}".</SemRegistros>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className={tabela.cabecalho}>
+                    <tr>
+                      <th className="py-2 pr-4">Prédio</th>
+                      <th className="pr-4">Bloco</th>
+                      <th className="pr-4">Andar</th>
+                      <th className="pr-4">Apto</th>
+                      <th></th>
                     </tr>
-                    {detalheId === u.id && (
-                      <tr className="border-b bg-slate-50">
-                        <td colSpan={5} className="px-3 py-3">
-                          <p className="font-medium">Moradores</p>
-                          {detalhe.moradores.length === 0 ? (
-                            <p className="text-slate-500">Nenhum morador nesta unidade.</p>
-                          ) : (
-                            <ul className="mb-3 list-disc pl-5">
-                              {detalhe.moradores.map((m) => (
-                                <li key={m.id}>
-                                  {m.nome} ({m.tipo === 'INQUILINO' ? 'inquilino' : 'proprietário'})
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                          <p className="font-medium">Vagas de garagem</p>
-                          {detalhe.vagas.length === 0 ? (
-                            <p className="text-slate-500">Nenhuma vaga vinculada.</p>
-                          ) : (
-                            <ul className="list-disc pl-5">
-                              {detalhe.vagas.map((v) => (
-                                <li key={v.id}>
-                                  Vaga {v.numero} — {v.coberta ? 'coberta' : 'descoberta'}
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody>
+                    {visiveis.map((u) => (
+                      // Fragment com key: agrupa as 2 linhas (<tr>) de cada unidade sem criar uma tag extra no HTML.
+                      <Fragment key={u.id}>
+                        <tr className={tabela.linha}>
+                          <td className={tabela.principal}>{u.predio.nomeCondominio}</td>
+                          <td className={tabela.texto}>{u.bloco}</td>
+                          <td className={tabela.texto}>{u.andar}º</td>
+                          <td className={tabela.texto}>{u.numeroApartamento}</td>
+                          <td className="py-2 text-right">
+                            <div className="flex justify-end gap-1">
+                              <BotaoIcone
+                                tipo="detalhes"
+                                ativo={detalheId === u.id}
+                                onClick={() => alternarDetalhe(u.id)}
+                              />
+                              <BotaoIcone tipo="editar" onClick={() => editar(u)} />
+                              <BotaoIcone tipo="excluir" onClick={() => setUnidadeParaExcluir(u)} />
+                            </div>
+                          </td>
+                        </tr>
+                        {detalheId === u.id && (
+                          <tr className="border-b border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-800/40">
+                            <td colSpan={5} className="px-3 py-3 text-slate-700 dark:text-slate-300">
+                              <p className="font-medium text-slate-800 dark:text-slate-100">Moradores</p>
+                              {detalhe.moradores.length === 0 ? (
+                                <p className="mb-3 text-slate-500 dark:text-slate-400">Nenhum morador nesta unidade.</p>
+                              ) : (
+                                <ul className="mb-3 list-disc pl-5">
+                                  {detalhe.moradores.map((m) => (
+                                    <li key={m.id}>
+                                      {m.nome} ({m.tipo === 'INQUILINO' ? 'inquilino' : 'proprietário'})
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                              <p className="font-medium text-slate-800 dark:text-slate-100">Vagas de garagem</p>
+                              {detalhe.vagas.length === 0 ? (
+                                <p className="text-slate-500 dark:text-slate-400">Nenhuma vaga vinculada.</p>
+                              ) : (
+                                <ul className="list-disc pl-5">
+                                  {detalhe.vagas.map((v) => (
+                                    <li key={v.id}>
+                                      Vaga {v.numero} — {v.coberta ? 'coberta' : 'descoberta'}
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Cartao>
+
+      {unidadeParaExcluir && (
+        <ModalConfirmar
+          titulo="Excluir unidade?"
+          mensagem={`Você vai excluir o apto ${unidadeParaExcluir.numeroApartamento} do bloco ${unidadeParaExcluir.bloco}. Essa ação não pode ser desfeita.`}
+          aoConfirmar={confirmarExclusao}
+          aoCancelar={() => setUnidadeParaExcluir(null)}
+        />
+      )}
     </>
   )
 }

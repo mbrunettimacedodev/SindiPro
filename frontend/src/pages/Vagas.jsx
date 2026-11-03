@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import { Aviso, Botao, Campo, Carregando, Cartao, SemRegistros, estiloInput } from '../components/ui.jsx'
+import ModalConfirmar from '../components/ModalConfirmar.jsx'
+import {
+  Aviso,
+  BarraFiltro,
+  Botao,
+  BotaoIcone,
+  Campo,
+  Carregando,
+  Cartao,
+  SemRegistros,
+  Selo,
+  estiloInput,
+  filtrar,
+  tabela,
+} from '../components/ui.jsx'
 
 const FORM_VAZIO = { numero: '', coberta: false, unidadeId: '' }
 
@@ -13,6 +27,8 @@ export default function Vagas() {
   const [erro, setErro] = useState('')
   const [campos, setCampos] = useState({})
   const [sucesso, setSucesso] = useState('')
+  const [busca, setBusca] = useState('')
+  const [vagaParaExcluir, setVagaParaExcluir] = useState(null)
 
   async function carregar() {
     setCarregando(true)
@@ -74,18 +90,30 @@ export default function Vagas() {
     setForm(FORM_VAZIO)
   }
 
-  async function excluir(id) {
-    if (!window.confirm('Excluir esta vaga?')) return
+  async function confirmarExclusao() {
+    const vaga = vagaParaExcluir
+    setVagaParaExcluir(null)
     setErro('')
     setSucesso('')
     try {
-      await api.delete(`/vagas/${id}`)
+      await api.delete(`/vagas/${vaga.id}`)
       setSucesso('Vaga excluída.')
       carregar()
     } catch (e) {
       setErro(e.message)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
+
+  const visiveis = filtrar(
+    vagas,
+    busca,
+    (v) =>
+      `${v.numero} ${v.coberta ? 'coberta' : 'descoberta'} ${
+        v.unidade ? `bloco ${v.unidade.bloco} apto ${v.unidade.numeroApartamento}` : 'livre'
+      }`,
+  )
+  const contador = busca.trim() ? `${visiveis.length} de ${vagas.length}` : vagas.length
 
   return (
     <>
@@ -107,11 +135,11 @@ export default function Vagas() {
               ))}
             </select>
           </Campo>
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <input name="coberta" type="checkbox" checked={form.coberta} onChange={mudar} />
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+            <input name="coberta" type="checkbox" checked={form.coberta} onChange={mudar} className="h-4 w-4" />
             Vaga coberta
           </label>
-          <div className="flex gap-2 sm:col-span-2">
+          <div className="flex justify-center gap-2 sm:col-span-2">
             <Botao type="submit">{editandoId ? 'Salvar alterações' : 'Cadastrar'}</Botao>
             {editandoId && (
               <Botao type="button" variante="neutro" onClick={cancelar}>
@@ -122,43 +150,66 @@ export default function Vagas() {
         </form>
       </Cartao>
 
-      <Cartao titulo="Vagas cadastradas">
+      <Cartao titulo={`Vagas cadastradas (${contador})`}>
         {carregando ? (
           <Carregando />
         ) : vagas.length === 0 ? (
           <SemRegistros>Nenhuma vaga cadastrada ainda.</SemRegistros>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b text-slate-500">
-                <tr>
-                  <th className="py-2">Vaga</th>
-                  <th>Tipo</th>
-                  <th>Unidade</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {vagas.map((v) => (
-                  <tr key={v.id} className="border-b last:border-0">
-                    <td className="py-2 font-medium">{v.numero}</td>
-                    <td>{v.coberta ? 'Coberta' : 'Descoberta'}</td>
-                    <td>
-                      {v.unidade ? `Bloco ${v.unidade.bloco}, apto ${v.unidade.numeroApartamento}` : (
-                        <span className="text-slate-400">Livre</span>
-                      )}
-                    </td>
-                    <td className="space-x-2 py-2 text-right">
-                      <Botao variante="neutro" onClick={() => editar(v)}>Editar</Botao>
-                      <Botao variante="perigo" onClick={() => excluir(v.id)}>Excluir</Botao>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <>
+            <BarraFiltro busca={busca} aoBuscar={setBusca} placeholder="Pesquisar por número, tipo, bloco, apto ou livre..." />
+
+            {visiveis.length === 0 ? (
+              <SemRegistros>Nenhuma vaga encontrada para "{busca}".</SemRegistros>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead className={tabela.cabecalho}>
+                    <tr>
+                      <th className="py-2 pr-4">Vaga</th>
+                      <th className="pr-4">Tipo</th>
+                      <th className="pr-4">Unidade</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visiveis.map((v) => (
+                      <tr key={v.id} className={tabela.linha}>
+                        <td className={tabela.principal}>{v.numero}</td>
+                        <td className={tabela.texto}>
+                          <Selo cor={v.coberta ? 'azul' : 'cinza'}>{v.coberta ? 'Coberta' : 'Descoberta'}</Selo>
+                        </td>
+                        <td className={tabela.texto}>
+                          {v.unidade ? (
+                            `Bloco ${v.unidade.bloco}, apto ${v.unidade.numeroApartamento}`
+                          ) : (
+                            <Selo cor="verde">Livre</Selo>
+                          )}
+                        </td>
+                        <td className="py-2 text-right">
+                          <div className="flex justify-end gap-1">
+                            <BotaoIcone tipo="editar" onClick={() => editar(v)} />
+                            <BotaoIcone tipo="excluir" onClick={() => setVagaParaExcluir(v)} />
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </Cartao>
+
+      {vagaParaExcluir && (
+        <ModalConfirmar
+          titulo="Excluir vaga?"
+          mensagem={`Você vai excluir a vaga "${vagaParaExcluir.numero}". Essa ação não pode ser desfeita.`}
+          aoConfirmar={confirmarExclusao}
+          aoCancelar={() => setVagaParaExcluir(null)}
+        />
+      )}
     </>
   )
 }

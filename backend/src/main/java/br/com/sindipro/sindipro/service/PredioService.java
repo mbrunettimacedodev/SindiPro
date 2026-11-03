@@ -3,6 +3,7 @@ package br.com.sindipro.sindipro.service;
 import br.com.sindipro.sindipro.exception.RecursoNaoEncontradoException;
 import br.com.sindipro.sindipro.exception.RegraNegocioException;
 import br.com.sindipro.sindipro.model.Predio;
+import br.com.sindipro.sindipro.repository.EventoRepository;
 import br.com.sindipro.sindipro.repository.PredioRepository;
 import br.com.sindipro.sindipro.repository.UnidadeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ public class PredioService {
     // Este Service precisa de um SEGUNDO repository só para checar a regra de apagar.
     @Autowired
     private UnidadeRepository unidadeRepository;
+
+    @Autowired
+    private EventoRepository eventoRepository;
 
     public List<Predio> listarTodos() {
         return predioRepository.findAll();
@@ -49,6 +53,9 @@ public class PredioService {
         // Sem essa checagem o banco recusaria (foreign key) e o usuário veria um erro 500 incompreensível.
         if (unidadeRepository.existsByPredioId(id)) {
             throw new RegraNegocioException("Não é possível excluir: o prédio ainda possui unidades cadastradas");
+        }
+        if (eventoRepository.existsByPredioId(id)) {
+            throw new RegraNegocioException("Não é possível excluir: o prédio possui eventos cadastrados");
         }
         predioRepository.deleteById(id);
     }
